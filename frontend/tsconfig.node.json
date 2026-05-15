@@ -1,0 +1,13 @@
+{
+  /* Separate tsconfig for Vite config files (vite.config.ts, tailwind.config.ts).
+     These run in Node, not the browser, so they need different lib/module settings. */
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true
+  },
+  "include": ["vite.config.ts", "tailwind.config.ts", "postcss.config.js"]
+}

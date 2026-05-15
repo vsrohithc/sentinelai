@@ -1,0 +1,21 @@
+# GitHub funding configuration.
+#
+# Uncomment any of the lines below and add your username / project handle to
+# show a "Sponsor" button on the repository home page. Leaving every line
+# commented (the default below) does NOT show the button.
+#
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# github: [vsrohithc]
+# patreon: <patreon-username>
+# open_collective: <collective-slug>
+# ko_fi: <ko-fi-username>
+# tidelift: <platform-name>/<package-name>
+# community_bridge: <project-name>
+# liberapay: <liberapay-username>
+# issuehunt: <issuehunt-username>
+# lfx_crowdfunding: <project-name>
+# polar: <polar-username>
+# buy_me_a_coffee: <buy-me-a-coffee-username>
+# thanks_dev: u/gh/<github-username>
+# custom: ['https://example.com/donate']

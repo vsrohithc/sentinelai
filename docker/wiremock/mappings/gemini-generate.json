@@ -1,0 +1,36 @@
+{
+  "mappings": [
+    {
+      "name": "Google Gemini generateContent — demo stub",
+      "request": {
+        "method": "POST",
+        "urlPattern": "/v1beta/models/.+:generateContent.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "This is a SentinelAI demo response from Google Gemini. In a real deployment this would be the actual Gemini output. Your prompt was received, logged, and scored for injection risk — visit the dashboard at http://localhost:3000 to see the full audit trail."
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 38,
+            "candidatesTokenCount": 54,
+            "totalTokenCount": 92
+          }
+        }
+      }
+    }
+  ]
+}

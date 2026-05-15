@@ -1,0 +1,40 @@
+# EditorConfig — http://editorconfig.org
+#
+# Tells every supported editor / IDE to apply the same whitespace conventions,
+# so PRs don't churn on tabs-vs-spaces or trailing-newline diffs.
+
+root = true
+
+# ── Defaults that apply to every file ─────────────────────────────────────────
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# ── Java — 4 spaces (Spring Boot convention) ──────────────────────────────────
+[*.java]
+indent_size = 4
+max_line_length = 120
+
+# ── XML (pom.xml, logback config, GitHub workflows) ───────────────────────────
+[*.{xml,yml,yaml}]
+indent_size = 2
+
+# ── TypeScript / JavaScript / JSON / CSS — 2 spaces (community standard) ──────
+[*.{ts,tsx,js,jsx,json,cjs,mjs,css,html}]
+indent_size = 2
+
+# ── Markdown — preserve trailing whitespace (used for line breaks) ────────────
+[*.md]
+trim_trailing_whitespace = false
+
+# ── Makefile — tabs are mandatory ─────────────────────────────────────────────
+[Makefile]
+indent_style = tab
+
+# ── Shell scripts — 2 spaces ──────────────────────────────────────────────────
+[*.sh]
+indent_size = 2

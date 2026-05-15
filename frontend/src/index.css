@@ -1,0 +1,7 @@
+/* Tailwind CSS layers — processed by PostCSS at build time.
+   base:       normalizes browser defaults (think CSS reset)
+   components: Tailwind's component utilities
+   utilities:  the full utility class set (text-*, bg-*, flex, etc.) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

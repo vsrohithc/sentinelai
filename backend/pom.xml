@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        Spring Boot parent manages all dependency versions, plugin configs,
+        and encoding defaults so we don't have to specify them manually.
+        Upgrading this single version upgrades the entire managed ecosystem.
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.sentinelai</groupId>
+    <artifactId>sentinelai-backend</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>SentinelAI Backend</name>
+    <description>
+        AI governance proxy backend — routes every prompt through parallel async calls
+        to the target AI model and a prompt injection detection API, returns the AI
+        response immediately with zero added latency, then persists the full audit record
+        (prompt + response + risk score) asynchronously.
+    </description>
+
+    <properties>
+        <!--
+            Java 21 for virtual threads (Project Loom), pattern matching, and record types.
+            Virtual threads are especially valuable for the WebClient async I/O model.
+        -->
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+
+        <!--
+            WebFlux: reactive HTTP server + WebClient.
+            WebClient fires the AI model call and the detection API call in parallel
+            using Mono.zip(), returning both results without blocking a thread.
+            This is the core of the zero-latency proxy architecture.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!--
+            Spring Data JPA + Hibernate: ORM layer for PostgreSQL.
+            Handles all SQL for PromptLog audit records.
+            ddl-auto is set to 'validate' — Flyway (below) owns all DDL.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!--
+            Flyway: database migration tool.
+            Every schema change is a versioned SQL file in db/migration/
+            so the database evolves reproducibly across dev / staging / prod.
+            Never let Hibernate auto-create or alter tables.
+        -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
+        <!--
+            PostgreSQL JDBC driver — runtime only, not needed at compile time.
+            Version is managed by the Spring Boot parent BOM.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
+            Actuator: /actuator/health and /actuator/metrics endpoints.
+            Used by Docker healthchecks and future monitoring dashboards.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!--
+            Lombok: compile-time code generation (@Getter, @Setter, @Builder, @Slf4j, etc.).
+            Drastically reduces boilerplate on entity, DTO, and service classes.
+            Marked optional so it is NOT included in downstream consumers.
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Spring Boot test slice: JUnit 5, Mockito, AssertJ, WebTestClient.
+            WebTestClient is the reactive equivalent of MockMvc for WebFlux endpoints.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Reactor Test: StepVerifier for asserting Mono/Flux streams in unit tests.
+            Required when testing any reactive service or client directly.
+        -->
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            WireMock: standalone HTTP mock server for integration tests.
+            Used to stub the AI model API and detection API responses so the
+            integration test does not require live external services.
+            The standalone variant avoids servlet/Jetty classpath conflicts
+            with Spring WebFlux's Netty server.
+        -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>3.5.4</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            H2 in-memory database for integration tests.
+            Flyway and JPA run against H2 in tests so the test suite does not
+            require a running PostgreSQL instance. H2's PostgreSQL compatibility
+            mode handles the JSONB and UUID column types used in prompt_logs.
+        -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Bucket4j: token-bucket rate limiting library.
+            Used to limit the rate of requests to POST /api/proxy so that
+            a single caller cannot flood the proxy and exhaust upstream AI
+            API quotas. In-memory buckets are sufficient for a single-node
+            deployment; a distributed cache (Redis) can be added later.
+        -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+
+        <!--
+            Logstash Logback Encoder: serialises every Logback log event as
+            structured JSON. In production this makes logs machine-parseable
+            by log aggregators (Datadog, Splunk, CloudWatch, ELK stack) without
+            any custom parsing rules. Activated only on the "prod" Spring profile
+            via logback-spring.xml profile-based configuration.
+        -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
+        <!--
+            Spring Boot Validation: Bean Validation (JSR-380) annotations.
+            Used to validate ProxyRequest DTO fields (@NotBlank, @NotNull).
+            GlobalExceptionHandler maps WebExchangeBindException to a structured
+            400 response with per-field error details.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!--
+            Caffeine: high-performance, near-optimal in-memory caching library.
+            Used in RateLimitConfig to replace an unbounded ConcurrentHashMap with
+            a size-capped, TTL-evicting cache so per-IP rate-limit buckets are
+            automatically evicted for IPs that stop sending traffic. Without eviction
+            the map grows without bound under sustained traffic from many unique IPs,
+            eventually causing an OutOfMemoryError.
+            Version is managed by the Spring Boot BOM — no explicit version needed.
+        -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+
+            <!--
+                Spring Boot Maven plugin: packages the app as an executable fat JAR.
+                The exclude block strips Lombok from the final artifact because
+                it is a compile-time-only annotation processor, not needed at runtime.
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!--
+                JaCoCo: Java code coverage reporting.
+                - prepare-agent  binds to initialize phase — instruments bytecode before tests run
+                - report         binds to verify phase — generates HTML + XML coverage reports
+                                 under target/site/jacoco/ after tests complete
+                - check          enforces a minimum line coverage threshold (80%).
+                                 CI fails the build if coverage drops below this floor,
+                                 preventing regressions from slipping through.
+
+                The XML report is consumed by the CI jacoco-report step so GitHub
+                Actions can post coverage summaries on pull requests.
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <!-- Instruments classes before Surefire runs unit tests -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals><goal>prepare-agent</goal></goals>
+                    </execution>
+                    <!-- Generates the HTML + XML report after tests complete -->
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals><goal>report</goal></goals>
+                    </execution>
+                    <!-- Fails the build if overall line coverage drops below 80% -->
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                            <!-- Exclude generated and infrastructure classes from coverage check -->
+                            <excludes>
+                                <exclude>com/sentinelai/SentinelAIApplication.class</exclude>
+                                <exclude>com/sentinelai/dto/**</exclude>
+                                <exclude>com/sentinelai/model/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
+    </build>
+
+</project>

@@ -1,0 +1,58 @@
+# SentinelAI Docker Compose — local development infrastructure
+#
+# Starts PostgreSQL 16 for the Spring Boot backend.
+# The backend itself runs outside Docker during development (mvn spring-boot:run).
+#
+# Usage:
+#   cp ../.env.example ../.env   # fill in values first
+#   docker-compose up -d         # start in background
+#   docker-compose down          # stop (data is preserved in named volume)
+#   docker-compose down -v       # stop AND delete all data (destructive)
+#
+# Prerequisites: copy .env.example to .env at the repo root and fill in values.
+
+version: '3.9'
+
+services:
+
+  postgres:
+    # postgres:16-alpine — alpine variant is ~80 MB vs ~250 MB for the full image.
+    # No functionality is lost for our use case; only system utilities differ.
+    image: postgres:16-alpine
+    container_name: sentinelai-postgres
+    # restart: unless-stopped means Docker restarts the container after a crash
+    # or host reboot, but not if you manually ran 'docker stop'.
+    restart: unless-stopped
+
+    environment:
+      # Credentials are injected from .env — never hard-code secrets here.
+      # Docker Compose automatically reads .env from the project root.
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    ports:
+      # Expose on the host so the Spring Boot app (running outside Docker) can connect.
+      # POSTGRES_PORT defaults to 5432; override in .env if another Postgres is running.
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    volumes:
+      # Named volume — Docker manages the lifecycle.
+      # Data survives 'docker-compose down' but is deleted by 'docker-compose down -v'.
+      - sentinelai-postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      # pg_isready exits 0 only when PostgreSQL is accepting connections.
+      # Spring Boot's Flyway startup blocks until this check passes (via depends_on
+      # when the backend is added to this compose file in Phase 6).
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  # Declaring the volume here makes it a first-class Docker object with a stable name.
+  # Without this declaration, Compose would generate a random-prefixed volume name.
+  sentinelai-postgres-data:
+    driver: local

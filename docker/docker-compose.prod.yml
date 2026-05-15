@@ -1,0 +1,164 @@
+# SentinelAI Docker Compose — production deployment
+#
+# Starts all three services: PostgreSQL, Spring Boot backend, and Nginx frontend.
+# Every service has a HEALTHCHECK, restart policy, and depends_on ordering so
+# the stack self-heals after crashes and starts up in the correct sequence.
+#
+# ── Prerequisites ────────────────────────────────────────────────────────────
+#   1. Build the images:
+#        docker build -t sentinelai-backend:latest ../backend
+#        docker build -t sentinelai-frontend:latest ../frontend
+#   2. Copy .env.example to .env at the repo root and fill in ALL values.
+#        cp ../.env.example ../.env
+#   3. Start the stack:
+#        docker-compose -f docker-compose.prod.yml up -d
+#
+# ── Stopping / updating ──────────────────────────────────────────────────────
+#   docker-compose -f docker-compose.prod.yml down         # stop, keep data
+#   docker-compose -f docker-compose.prod.yml down -v      # stop + delete data
+#   docker-compose -f docker-compose.prod.yml pull && up -d --force-recreate
+#
+# See docs/deployment.md for the full first-run checklist.
+
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL 16 ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentinelai-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    # In production DO NOT expose the DB port to the host — other containers
+    # reach it via the internal Docker network. Remove the ports block entirely
+    # or bind to 127.0.0.1 only if local access is needed for maintenance.
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+    volumes:
+      - sentinelai-postgres-data:/var/lib/postgresql/data
+
+    networks:
+      - sentinelai-internal
+
+    healthcheck:
+      # pg_isready exits 0 only when Postgres is accepting connections.
+      # The backend's depends_on condition waits for this before starting.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Spring Boot backend ────────────────────────────────────────────────────
+  backend:
+    image: sentinelai-backend:latest
+    container_name: sentinelai-backend
+    restart: unless-stopped
+
+    # All secrets injected via environment — nothing is hard-coded in the image.
+    environment:
+      # Database
+      DB_URL:      jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # Detection strategy — see .env.example for the full explanation.
+      # Defaults to 'none' (pure governance) so the production stack ships
+      # without sending prompt data anywhere by default.
+      DETECTION_STRATEGY: ${DETECTION_STRATEGY:-none}
+      DETECTION_API_URL: ${DETECTION_API_URL:-}
+      DETECTION_API_KEY: ${DETECTION_API_KEY:-}
+      DETECTION_TIMEOUT_MS: ${DETECTION_TIMEOUT_MS:-5000}
+
+      # AI providers — supply only the providers your deployment uses
+      OPENAI_API_KEY:    ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY:    ${GEMINI_API_KEY:-}
+      AZURE_OPENAI_ENDPOINT:   ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY:    ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-02-01}
+
+      # SentinelAI auth + rate limiting
+      SENTINEL_API_KEYS: ${SENTINEL_API_KEYS:-}
+      RATE_LIMIT_CAPACITY: ${RATE_LIMIT_CAPACITY:-60}
+      RATE_LIMIT_REFILL_PER_MINUTE: ${RATE_LIMIT_REFILL_PER_MINUTE:-60}
+
+      # License keys
+      SENTINEL_LICENSES: ${SENTINEL_LICENSES:-}
+
+      # Activate structured JSON logging (logback-spring.xml prod profile)
+      SPRING_PROFILES_ACTIVE: prod
+
+    # Only expose the backend port internally — Nginx proxies /api/* to it.
+    # Binding to the host is unnecessary and increases attack surface.
+    expose:
+      - "8080"
+
+    networks:
+      - sentinelai-internal
+
+    depends_on:
+      postgres:
+        # Wait until Postgres healthcheck reports healthy before starting.
+        # Flyway migrations run at startup and need a live database.
+        condition: service_healthy
+
+    healthcheck:
+      # Actuator health endpoint returns {"status":"UP"} when Spring Boot is ready.
+      test: ["CMD-SHELL",
+             "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Nginx frontend ─────────────────────────────────────────────────────────
+  frontend:
+    image: sentinelai-frontend:latest
+    container_name: sentinelai-frontend
+    restart: unless-stopped
+
+    ports:
+      # Expose port 80 to the host. In production, put a TLS-terminating
+      # reverse proxy (Caddy, Nginx, AWS ALB) in front of this and point it
+      # at port 80. Do not expose port 443 from this container.
+      - "${FRONTEND_PORT:-80}:80"
+
+    networks:
+      - sentinelai-internal
+
+    depends_on:
+      backend:
+        # Only start Nginx once the backend is healthy so the dashboard does
+        # not render a broken state on first load.
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# ── Networks ────────────────────────────────────────────────────────────────
+networks:
+  sentinelai-internal:
+    # Private bridge network. Only containers in this network can communicate
+    # with each other. The frontend is the only container with a port published
+    # to the host, making the DB and backend unreachable from outside Docker.
+    driver: bridge
+
+# ── Volumes ─────────────────────────────────────────────────────────────────
+volumes:
+  sentinelai-postgres-data:
+    # Named volume — data persists across container restarts and image updates.
+    # Deleted only with: docker-compose -f docker-compose.prod.yml down -v
+    driver: local

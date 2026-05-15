@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SentinelAI structured logging configuration.
+
+  Strategy
+  ════════
+  • Development (default / "dev" profile): human-readable coloured console output
+    using Spring Boot's default pattern. Easy to read in a terminal.
+
+  • Production ("prod" profile): every log event is serialised as a single-line
+    JSON object using logstash-logback-encoder. JSON logs are machine-parseable
+    by log aggregators (Datadog, Splunk, CloudWatch Logs, ELK stack) without any
+    custom parsing rules.
+
+  Activation
+  ══════════
+  The active Spring profile controls which appender is used:
+    spring.profiles.active=prod   → JSON to stdout (captured by Docker log driver)
+    (anything else)               → coloured ANSI console
+
+  Standard fields emitted in JSON mode (logstash-logback-encoder defaults):
+    @timestamp, @version, message, logger_name, thread_name, level, level_value,
+    stack_trace (when exception is present)
+
+  Custom fields added via MDC or StructuredArguments:
+    request_id, client_ip, provider, model, risk_score (set in ProxyService)
+-->
+<configuration>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         DEVELOPMENT appender — coloured human-readable console output.
+         Active on all profiles OTHER than "prod".
+         ══════════════════════════════════════════════════════════════════════ -->
+    <springProfile name="!prod">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <!--
+                    Spring Boot built-in coloured pattern:
+                    timestamp  log-level  PID  [thread]  logger : message
+                    Colours are stripped automatically when the output is not a TTY
+                    (e.g. when captured by Docker without a pseudo-TTY).
+                -->
+                <pattern>
+                    %clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx
+                </pattern>
+                <charset>UTF-8</charset>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+
+        <!-- Reduce noise from chatty framework packages in dev -->
+        <logger name="org.springframework"       level="WARN"/>
+        <logger name="org.hibernate"             level="WARN"/>
+        <logger name="io.netty"                  level="WARN"/>
+        <logger name="reactor.netty"             level="WARN"/>
+        <!-- Keep our own code at DEBUG in dev for maximum visibility -->
+        <logger name="com.sentinelai"            level="DEBUG"/>
+    </springProfile>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         PRODUCTION appender — structured JSON to stdout.
+         Active only on the "prod" Spring profile.
+         Docker's log driver captures stdout and ships it to the log aggregator.
+         ══════════════════════════════════════════════════════════════════════ -->
+    <springProfile name="prod">
+        <appender name="JSON_STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <!--
+                    LogstashEncoder writes one JSON object per line.
+
+                    Custom fields below are always present in every log line so
+                    operators can filter by application and environment in their
+                    log aggregator without parsing the message string.
+                -->
+                <customFields>{"app":"sentinelai","env":"prod"}</customFields>
+
+                <!--
+                    Include the caller class + method name so log lines can be
+                    traced back to source without a stack trace. Disabled by
+                    default in logstash-logback-encoder for performance; re-enable
+                    if traceability is more important than throughput.
+                -->
+                <!-- <includeCallerData>true</includeCallerData> -->
+
+                <!--
+                    Shorten logger names for readability in aggregator UI:
+                    com.sentinelai.service.ProxyService → c.s.s.ProxyService
+                -->
+                <shortenedLoggerNameLength>36</shortenedLoggerNameLength>
+
+                <!--
+                    Standard timestamp field name used by Elasticsearch / Datadog.
+                    Overriding here ensures compatibility with log pipelines that
+                    expect @timestamp rather than the logstash default "timestamp".
+                -->
+                <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampPattern>
+                <timeZone>UTC</timeZone>
+
+                <!--
+                    Include MDC (Mapped Diagnostic Context) fields as top-level
+                    JSON keys. ProxyService sets MDC fields (request_id, provider,
+                    model) so they appear on every log line within a request
+                    without needing to pass them through every method call.
+                -->
+                <includeMdcKeyName>request_id</includeMdcKeyName>
+                <includeMdcKeyName>client_ip</includeMdcKeyName>
+                <includeMdcKeyName>provider</includeMdcKeyName>
+                <includeMdcKeyName>model</includeMdcKeyName>
+                <includeMdcKeyName>risk_score</includeMdcKeyName>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="JSON_STDOUT"/>
+        </root>
+
+        <!-- In production, silence the noisiest framework loggers entirely.
+             They log at INFO by default; setting WARN reduces log volume and cost. -->
+        <logger name="org.springframework"       level="WARN"/>
+        <logger name="org.hibernate"             level="WARN"/>
+        <logger name="io.netty"                  level="WARN"/>
+        <logger name="reactor.netty"             level="WARN"/>
+        <logger name="com.zaxxer.hikari"         level="WARN"/>
+        <logger name="org.flywaydb"              level="INFO"/>
+        <!-- Keep application code at INFO in production -->
+        <logger name="com.sentinelai"            level="INFO"/>
+    </springProfile>
+
+</configuration>

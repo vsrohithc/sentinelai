@@ -1,0 +1,8 @@
+# CODEOWNERS
+#
+# GitHub automatically requests a review from the listed owners when a PR
+# touches the matching paths.
+#
+# Solo project — all paths owned by the maintainer.
+
+* @vsrohithc

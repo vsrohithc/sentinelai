@@ -1,0 +1,39 @@
+{
+  "mappings": [
+    {
+      "name": "OpenAI Chat Completions — demo stub",
+      "request": {
+        "method": "POST",
+        "urlPattern": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "id": "chatcmpl-demo-{{randomValue type='UUID'}}",
+          "object": "chat.completion",
+          "created": 1710000000,
+          "model": "gpt-4o",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "This is a SentinelAI demo response. In a real deployment this would be the actual AI model output. Your prompt was received, logged, and scored for injection risk. Visit the dashboard at http://localhost:3000 to see the audit trail."
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 42,
+            "completion_tokens": 58,
+            "total_tokens": 100
+          }
+        },
+        "transformers": ["response-template"]
+      }
+    }
+  ]
+}

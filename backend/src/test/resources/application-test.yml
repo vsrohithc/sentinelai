@@ -1,0 +1,57 @@
+# ─── Test profile configuration for SentinelAI integration tests ─────────────
+#
+# This file is loaded automatically when tests run with @ActiveProfiles("test").
+# It overrides production settings to use H2 in-memory database and disables
+# external service dependencies so tests can run without Docker or live APIs.
+#
+# WireMock stubs replace the AI model and detection APIs at test time;
+# the actual URLs are set programmatically in the test class after WireMock
+# starts and assigns a port.
+
+spring:
+  datasource:
+    # H2 in-memory database in PostgreSQL compatibility mode.
+    # The MODE=PostgreSQL flag enables PostgreSQL-specific SQL syntax so
+    # Flyway migrations using PostgreSQL idioms run correctly against H2.
+    url: jdbc:h2:mem:sentinelai_test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=VALUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      # In tests, use create-drop so H2 schema is rebuilt fresh for each test run.
+      # Flyway still runs migrations; this setting only controls what Hibernate does
+      # after Flyway has set up the schema.
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        show_sql: true
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # H2 does not have a flyway_schema_history table on first run, so we baseline it.
+    baseline-on-migrate: true
+    baseline-version: 0
+
+sentinelai:
+  # Tests that exercise scoring switch the strategy programmatically via
+  # @DynamicPropertySource. The default here is 'external' so the existing
+  # WireMock-backed tests for the proxy continue to work without changes;
+  # those tests register sentinelai.detection.external.api-url to point at
+  # their WireMock instance.
+  detection:
+    strategy: external
+    external:
+      api-url: http://localhost:9998      # placeholder — overridden in tests
+      api-key: test-detection-key
+      timeout-ms: 3000
+
+  retention:
+    free-days: 7
+    paid-30-days: 30
+    paid-90-days: 90
+    paid-365-days: 365

@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    /* Target ES2022 for modern JS features (top-level await, at(), etc.) supported by all current browsers */
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* vite/client provides types for import.meta.env, import.meta.hot, etc. */
+    "types": ["vite/client"],
+
+    /* Bundler mode — Vite handles module resolution at build time, not tsc */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    /* isolatedModules: required by Vite — each file must be independently compilable */
+    "isolatedModules": true,
+    /* noEmit: tsc is used for type-checking only; Vite does the actual transpilation */
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Strict mode — catches null dereferences, implicit any, and other real bugs at compile time */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* Path alias — @/ maps to src/ (must match the alias in vite.config.ts) */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

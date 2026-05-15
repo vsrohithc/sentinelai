@@ -1,0 +1,189 @@
+# SentinelAI backend configuration
+# All secrets and environment-specific values are injected via environment variables.
+# See .env.example at the repo root for every variable and its purpose.
+# Never hard-code credentials here — this file is committed to source control.
+
+spring:
+  application:
+    # Used in log output, Actuator info endpoint, and Spring Cloud service registration
+    name: sentinelai
+
+  # ─── PostgreSQL datasource ───────────────────────────────────────────────────
+  datasource:
+    # Full JDBC URL; constructed from .env values for local dev
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sentinelai}
+    username: ${DB_USERNAME:sentinelai}
+    password: ${DB_PASSWORD:sentinelai}
+    driver-class-name: org.postgresql.Driver
+    # ── HikariCP connection pool ───────────────────────────────────────────────
+    # Spring Boot auto-configures HikariCP; we override the defaults here because
+    # the out-of-the-box pool size (10) is too small for production traffic and
+    # the default connection timeout (30 s) makes failures too slow to surface.
+    hikari:
+      # Max pool size: number of DB connections kept open.
+      # Rule of thumb: (2 × vCPU) + effective_spindle_count for a WRITE-heavy workload.
+      # For read-heavy or async audit logging, 20 is a safe starting point.
+      # Raise if you see HikariPool-1 - Connection is not available errors in logs.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      # Minimum idle connections to keep warm. Setting equal to max avoids the
+      # overhead of connection ramp-up during sudden traffic spikes.
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      # Time (ms) a thread will wait for a connection before throwing an exception.
+      # 5 s is aggressive — surface database problems quickly rather than piling up.
+      connection-timeout: 5000
+      # Time (ms) a connection can sit idle before being evicted (10 minutes).
+      idle-timeout: 600000
+      # Maximum lifetime of a connection in the pool (30 minutes).
+      # Must be less than the PostgreSQL server's idle connection timeout.
+      max-lifetime: 1800000
+      # Used by Hikari's keepalive query to validate idle connections.
+      # SELECT 1 is the lightest possible validation on PostgreSQL.
+      connection-test-query: SELECT 1
+      # Pool name appears in logs and JMX metrics — useful when running multiple pools.
+      pool-name: SentinelAI-HikariPool
+
+  # ─── JPA / Hibernate ─────────────────────────────────────────────────────────
+  jpa:
+    hibernate:
+      # 'validate' means Hibernate checks that entity mappings match the DB schema
+      # but never creates, alters, or drops tables. Flyway owns all DDL.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Logging all SQL is useful in development but very noisy in production.
+        # Toggle via SHOW_SQL env var — defaults to false.
+        show_sql: ${SHOW_SQL:false}
+        format_sql: ${SHOW_SQL:false}
+
+  # ─── Flyway migrations ────────────────────────────────────────────────────────
+  flyway:
+    enabled: true
+    # Flyway scans this classpath location for versioned SQL files (V1__, V2__, etc.)
+    locations: classpath:db/migration
+    # baseline-on-migrate: false means Flyway will fail if the schema_version table
+    # does not exist on first run, which is the correct behavior for a fresh DB.
+    baseline-on-migrate: false
+
+# ─── Actuator ────────────────────────────────────────────────────────────────
+# Exposes health, info, and metrics endpoints for Docker healthchecks and monitoring.
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only expose the endpoints we actually need — not the full set
+        include: health,info,metrics
+  endpoint:
+    health:
+      # show-details: always lets Docker / k8s probes see DB connectivity status
+      show-details: always
+
+# ─── SentinelAI application settings ─────────────────────────────────────────
+sentinelai:
+
+  # ─── Detection strategy (pluggable) ─────────────────────────────────────
+  # SentinelAI is a governance + audit platform. Scoring prompts for injection
+  # risk is OPT-IN — the headline value (the audit trail) is always present.
+  #
+  #   none     — no scoring. Every audit row gets risk_score=NULL. Default.
+  #   rules    — in-process regex + keyword scorer. Catches well-known
+  #              prompt-injection patterns. No data leaves the customer's
+  #              environment. Zero per-request cost.
+  #   external — POSTs every prompt to a third-party detection HTTP API
+  #              (Lakera Guard, Protect AI, your own service). OPT-IN ONLY
+  #              because the prompt text leaves the customer's environment.
+  detection:
+    strategy: ${DETECTION_STRATEGY:none}
+    external:
+      # Only used when strategy=external.
+      api-url: ${DETECTION_API_URL:}
+      api-key: ${DETECTION_API_KEY:}
+      # Per-call timeout. On timeout the score is null; the proxy still succeeds.
+      timeout-ms: ${DETECTION_TIMEOUT_MS:5000}
+
+  retention:
+    # Log retention in days per license tier.
+    # A nightly @Scheduled job deletes records older than the applicable threshold.
+    free-days: 7
+    paid-30-days: 30
+    paid-90-days: 90
+    paid-365-days: 365
+
+  # ─── Per-provider AI model configuration (Phase 5) ──────────────────────────
+  # Each provider has its own base URL and API key so operators can mix providers.
+  # Set only the providers your deployment uses — unconfigured providers will fail
+  # at call time (not at startup) with a clear error message.
+  providers:
+
+    openai:
+      # Base URL for OpenAI Chat Completions API (or any OpenAI-compatible provider)
+      api-url: ${OPENAI_API_URL:https://api.openai.com/v1}
+      # OpenAI API key (sk-...) — required to call OpenAI models
+      api-key: ${OPENAI_API_KEY:}
+
+    anthropic:
+      # Base URL for Anthropic Messages API
+      api-url: ${ANTHROPIC_API_URL:https://api.anthropic.com}
+      # Anthropic API key — required to call Claude models
+      api-key: ${ANTHROPIC_API_KEY:}
+
+    gemini:
+      # Base URL for Google Gemini generateContent REST API
+      api-url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com}
+      # Google AI Studio or Vertex AI API key — sent as a query parameter (?key=...)
+      api-key: ${GEMINI_API_KEY:}
+
+    azure-openai:
+      # Full Azure OpenAI resource endpoint, e.g. https://my-resource.openai.azure.com
+      # Leave blank if not using Azure OpenAI — the adapter will fail at call time
+      endpoint: ${AZURE_OPENAI_ENDPOINT:}
+      # Azure OpenAI API key (from the Azure portal Keys + Endpoint section)
+      api-key: ${AZURE_OPENAI_API_KEY:}
+      # The deployment name you created in Azure OpenAI Studio (not the model name)
+      deployment: ${AZURE_OPENAI_DEPLOYMENT:}
+      # Azure OpenAI API version — pin to a stable GA version to avoid surprises
+      api-version: ${AZURE_OPENAI_API_VERSION:2024-02-01}
+
+  # ─── API key authentication (Phase 6) ───────────────────────────────────────
+  # Comma-separated list of valid API keys for POST /api/proxy.
+  # When this value is blank (the default), API key auth is DISABLED and all
+  # requests are accepted. Set SENTINEL_API_KEYS to enable authentication.
+  # Example: SENTINEL_API_KEYS=sk-sentinel-abc123,sk-sentinel-def456
+  api-keys: ${SENTINEL_API_KEYS:}
+
+  # ─── Rate limiting (Phase 6) ─────────────────────────────────────────────
+  rate-limit:
+    # Maximum tokens in each per-IP bucket (controls burst capacity).
+    # At the defaults a single IP can fire 60 requests in a burst and then
+    # is limited to ~1 request per second on average.
+    capacity: ${RATE_LIMIT_CAPACITY:60}
+    # Tokens refilled per minute. Combined with capacity this drives the
+    # sustained throughput: 60 per minute ≈ 1 per second on average.
+    refill-per-minute: ${RATE_LIMIT_REFILL_PER_MINUTE:60}
+    # When true, the leftmost IP in the X-Forwarded-For header is used for
+    # rate-limit bucketing instead of the TCP remote address. Enable ONLY when
+    # running behind a trusted reverse proxy (Nginx, ALB) that strips or
+    # overwrites the header before forwarding — otherwise callers can spoof
+    # arbitrary IPs to escape their rate-limit bucket.
+    trust-proxy: ${RATE_LIMIT_TRUST_PROXY:false}
+
+  # ─── CORS ────────────────────────────────────────────────────────────────
+  cors:
+    # Comma-separated origins the browser is allowed to call from.
+    # Default is permissive for local dev — MUST be overridden in production.
+    # Example: CORS_ALLOWED_ORIGINS=https://app.sentinelai.io
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+
+  # ─── Async executor ──────────────────────────────────────────────────────
+  async:
+    # Core thread count kept alive in the @Async pool (tune to vCPU count)
+    core-pool-size: ${ASYNC_CORE_POOL_SIZE:4}
+    # Maximum thread count — absorbs bursts when queue fills
+    max-pool-size: ${ASYNC_MAX_POOL_SIZE:20}
+    # Bounded queue depth before extra threads (up to max) are created
+    queue-capacity: ${ASYNC_QUEUE_CAPACITY:500}
+
+# ─── Server ──────────────────────────────────────────────────────────────────
+server:
+  # Default 8080; change via SERVER_PORT if another service occupies that port
+  port: ${SERVER_PORT:8080}

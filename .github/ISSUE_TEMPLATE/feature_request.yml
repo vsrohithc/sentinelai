@@ -1,0 +1,71 @@
+name: Feature Request
+description: Suggest a new feature or improvement for SentinelAI
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature. Before submitting, please search existing issues to avoid duplicates.
+
+        For large changes (new providers, architectural shifts, API additions) consider starting a discussion so we can align on direction before any code is written.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the problem or gap this feature would address. What are you unable to do today?
+      placeholder: "There is no way to filter audit logs by provider. When running a mixed OpenAI + Anthropic deployment I can't isolate Anthropic requests in the dashboard."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe how you'd like this to work. Be as specific as you can — endpoint shape, config options, UI changes, etc.
+      placeholder: |
+        Add a `provider` filter parameter to `GET /api/logs`:
+        `GET /api/logs?provider=ANTHROPIC`
+
+        Add a provider dropdown to the Audit Log page in the dashboard.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other approaches you considered and why you prefer the proposed one.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this affect?
+      multiple: true
+      options:
+        - Backend API
+        - Frontend dashboard
+        - Database / migrations
+        - Docker / deployment
+        - Documentation
+        - Tests
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Would you be willing to open a pull request for this?
+      options:
+        - "Yes"
+        - "Yes, with guidance"
+        - "No"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, screenshots, related issues, or anything else helpful.

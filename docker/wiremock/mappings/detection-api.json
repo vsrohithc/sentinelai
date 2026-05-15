@@ -1,0 +1,150 @@
+{
+  "mappings": [
+
+    {
+      "name": "Detection — HIGH: ignore instructions (0.91)",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze",
+        "bodyPatterns": [{ "matchesJsonPath": { "expression": "$.text", "contains": "Ignore" } }]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "score": 0.91 }
+      }
+    },
+
+    {
+      "name": "Detection — HIGH: DAN jailbreak (0.87)",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze",
+        "bodyPatterns": [{ "matchesJsonPath": { "expression": "$.text", "contains": "DAN" } }]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "score": 0.87 }
+      }
+    },
+
+    {
+      "name": "Detection — HIGH: pretend unrestricted AI (0.83)",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze",
+        "bodyPatterns": [{ "matchesJsonPath": { "expression": "$.text", "contains": "Pretend" } }]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "score": 0.83 }
+      }
+    },
+
+    {
+      "name": "Detection — HIGH: jailbreak keyword (0.89)",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze",
+        "bodyPatterns": [{ "matchesJsonPath": { "expression": "$.text", "contains": "jailbreak" } }]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "score": 0.89 }
+      }
+    },
+
+    {
+      "name": "Detection — MEDIUM: bypass filter (0.55)",
+      "priority": 2,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze",
+        "bodyPatterns": [{ "matchesJsonPath": { "expression": "$.text", "contains": "bypass" } }]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "score": 0.55 }
+      }
+    },
+
+    {
+      "name": "Detection — MEDIUM: override behavior (0.58)",
+      "priority": 2,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze",
+        "bodyPatterns": [{ "matchesJsonPath": { "expression": "$.text", "contains": "override" } }]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "score": 0.58 }
+      }
+    },
+
+    {
+      "name": "Detection — MEDIUM: confidential data probe (0.62)",
+      "priority": 2,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze",
+        "bodyPatterns": [{ "matchesJsonPath": { "expression": "$.text", "contains": "confidential" } }]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "score": 0.62 }
+      }
+    },
+
+    {
+      "name": "Detection — FAILED: infrastructure keyword → 503",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze",
+        "bodyPatterns": [{ "matchesJsonPath": { "expression": "$.text", "contains": "infrastructure" } }]
+      },
+      "response": {
+        "status": 503,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "error": "Detection service temporarily unavailable" }
+      }
+    },
+
+    {
+      "name": "Detection — LOW: default catch-all (0.08)",
+      "priority": 10,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/analyze"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "score": 0.08 }
+      }
+    },
+
+    {
+      "name": "Detection — HEAD health check",
+      "request": {
+        "method": "HEAD",
+        "urlPattern": "/analyze"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+
+  ]
+}

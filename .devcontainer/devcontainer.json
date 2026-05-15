@@ -1,0 +1,37 @@
+{
+  "//": "GitHub Codespaces / VS Code Dev Container config.",
+  "//1": "Lets anyone click 'Code → Codespaces → Create codespace on main' on the repo home page and have the full SentinelAI demo running in their browser within ~2 minutes.",
+  "//2": "Image is the Microsoft Java + Node image so the backend (Java 21 + Maven) and frontend (Node 20) toolchains are both preinstalled.",
+
+  "name": "SentinelAI Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/java:21",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": { "version": "latest" }
+  },
+
+  "forwardPorts": [3000, 8080, 8090, 5432],
+  "portsAttributes": {
+    "3000": { "label": "Dashboard",    "onAutoForward": "openBrowser" },
+    "8080": { "label": "Backend API",  "onAutoForward": "silent" },
+    "8090": { "label": "WireMock",     "onAutoForward": "silent" },
+    "5432": { "label": "PostgreSQL",   "onAutoForward": "silent" }
+  },
+
+  "postCreateCommand": "docker compose up --build -d",
+  "postAttachCommand": "echo 'SentinelAI is ready — open the Dashboard tab forwarded as port 3000.'",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}

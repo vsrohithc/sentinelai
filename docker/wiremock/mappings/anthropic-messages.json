@@ -1,0 +1,32 @@
+{
+  "mappings": [
+    {
+      "name": "Anthropic Messages API — demo stub",
+      "request": {
+        "method": "POST",
+        "urlPattern": "/v1/messages"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "msg_demo_sentinelai",
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "This is a SentinelAI demo response from Anthropic Claude. In a real deployment this would be the actual Claude output. Your prompt was received, logged, and scored for injection risk — visit the dashboard at http://localhost:3000 to see the full audit trail."
+            }
+          ],
+          "model": "claude-3-5-sonnet-20241022",
+          "stop_reason": "end_turn",
+          "usage": {
+            "input_tokens": 38,
+            "output_tokens": 54
+          }
+        }
+      }
+    }
+  ]
+}

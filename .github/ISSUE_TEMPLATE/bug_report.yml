@@ -1,0 +1,78 @@
+name: Bug Report
+description: Report a bug or unexpected behaviour in SentinelAI
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Please fill in as much detail as possible to help us reproduce and fix it quickly.
+
+        **Security vulnerability?** Please read [SECURITY.md](../../SECURITY.md) instead of opening a public issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug. What did you expect to happen, and what actually happened?
+      placeholder: "When I send a request with provider=ANTHROPIC, I get a 500 error instead of the model response."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the issue.
+      placeholder: |
+        1. Start the stack with `make demo`
+        2. Send `curl -X POST http://localhost:8080/api/proxy -d '{"prompt":"hello","model":"claude-3-5-sonnet-20241022","provider":"ANTHROPIC"}'`
+        3. Observe HTTP 500 in the response
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      placeholder: "I expected HTTP 200 with the model response."
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or error output
+      description: Paste any relevant log output here (redact API keys and sensitive data).
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: SentinelAI version / commit
+      placeholder: "main @ abc1234 or v1.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running SentinelAI?
+      options:
+        - Docker Compose (make demo / make prod)
+        - Local development (make backend + make frontend)
+        - Kubernetes
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 14.4 / Ubuntu 22.04 / Windows 11"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that might be relevant — provider, model, metadata shape, etc.

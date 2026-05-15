@@ -1,0 +1,25 @@
+image: gitpod/workspace-full   # includes Docker, Java 21, Node 20, Maven
+
+tasks:
+  - name: Start SentinelAI demo
+    # init runs once during workspace prebuild (caches Docker images)
+    init: docker compose pull
+    # command runs every time the workspace opens
+    command: |
+      docker compose up --build -d
+      echo ""
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo "  SentinelAI is starting up..."
+      echo "  Dashboard will open automatically in a few seconds."
+      echo "  API: $(gp url 8080)"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+ports:
+  - port: 3000
+    onOpen: open-browser       # auto-opens the dashboard in a new tab
+    visibility: public
+  - port: 8080
+    onOpen: ignore
+    visibility: public
+  - port: 8090
+    onOpen: ignore             # WireMock — internal only
