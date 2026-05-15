@@ -87,14 +87,14 @@ jobs:
           zip -r "../sentinelai-frontend-${{ steps.version.outputs.version }}.zip" dist
 
       - name: Upload backend JAR artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-jar
           path: backend/target/sentinelai-backend-*.jar
           retention-days: 1
 
       - name: Upload frontend zip artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-zip
           path: sentinelai-frontend-*.zip
