@@ -12,8 +12,10 @@
 import { useEffect, useState } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { RiskBadge } from '../components/RiskBadge'
+import { SignatureBadge } from '../components/SignatureBadge'
 import { useLogs } from '../hooks/useLogs'
-import type { LogsParams } from '../api/logs'
+import { verifyLog } from '../api/logs'
+import type { LogsParams, VerificationResult } from '../api/logs'
 import type { PromptLog } from '../types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -101,8 +103,9 @@ interface DrawerProps {
  * Closed via the X button or by clicking the dark overlay backdrop.
  */
 function DetailDrawer({ log, onClose }: DrawerProps) {
-  // Close on Escape — a standard expectation for slide-in panels.
-  // The listener is attached when the drawer mounts and removed when it closes.
+  const [verification, setVerification] = useState<VerificationResult | null>(null)
+  const [verifying, setVerifying] = useState(false)
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -110,6 +113,16 @@ function DetailDrawer({ log, onClose }: DrawerProps) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // Auto-verify when the drawer opens for a signed record
+  useEffect(() => {
+    if (!log.signature) return
+    setVerifying(true)
+    verifyLog(log.id)
+      .then(setVerification)
+      .catch(() => setVerification(null))
+      .finally(() => setVerifying(false))
+  }, [log.id, log.signature])
 
   return (
     <>
@@ -195,6 +208,37 @@ function DetailDrawer({ log, onClose }: DrawerProps) {
               </pre>
             </div>
           )}
+
+          {/* Signature */}
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cryptographic Signature</h3>
+            <div className="rounded-md border border-gray-200 bg-gray-50 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <SignatureBadge
+                  signature={log.signature}
+                  valid={verification?.valid}
+                />
+                <span className="text-xs text-gray-700">
+                  {verifying && 'Verifying…'}
+                  {!verifying && !log.signature && 'Unsigned — signing was not enabled when this record was created'}
+                  {!verifying && log.signature && verification?.valid === true && 'Valid — record is unmodified'}
+                  {!verifying && log.signature && verification?.valid === false && (verification.reason ?? 'Signature invalid')}
+                </span>
+              </div>
+              {log.signature && (
+                <div>
+                  <span className="text-xs text-gray-400">Algorithm</span>
+                  <p className="font-mono text-xs text-gray-600">Ed25519</p>
+                </div>
+              )}
+              {log.signature && (
+                <div>
+                  <span className="text-xs text-gray-400">Signature</span>
+                  <p className="mt-0.5 break-all font-mono text-xs text-gray-500">{log.signature}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </aside>
     </>
@@ -330,12 +374,13 @@ export function AuditLog() {
                 <th className="px-4 py-3 text-left">Provider / Model</th>
                 <th className="px-4 py-3 text-left">Prompt preview</th>
                 <th className="px-4 py-3 text-left">Risk</th>
+                <th className="px-4 py-3 text-left">Sig</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {data?.content.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                     No records found.
                   </td>
                 </tr>
@@ -364,6 +409,9 @@ export function AuditLog() {
                   </td>
                   <td className="px-4 py-3">
                     <RiskBadge score={log.riskScore} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <SignatureBadge signature={log.signature} />
                   </td>
                 </tr>
               ))}
@@ -404,7 +452,7 @@ export function AuditLog() {
 
       {/* Detail drawer — rendered outside the table so it overlays everything */}
       {selected && (
-        <DetailDrawer log={selected} onClose={() => setSelected(null)} />
+        <DetailDrawer key={selected.id} log={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   )

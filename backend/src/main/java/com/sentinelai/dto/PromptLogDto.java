@@ -27,6 +27,7 @@ import java.util.UUID;
  * @param metadata    caller-supplied JSON metadata bag
  * @param licenseKey  license key from the {@code X-Sentinel-License} header; null for free tier
  * @param createdAt   timestamp the row was inserted by the async persistence path
+ * @param signature   Base64-encoded Ed25519 signature; null if signing was disabled at write time
  */
 public record PromptLogDto(
         UUID id,
@@ -38,5 +39,6 @@ public record PromptLogDto(
         BigDecimal riskScore,
         Map<String, Object> metadata,
         String licenseKey,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        String signature
 ) {}

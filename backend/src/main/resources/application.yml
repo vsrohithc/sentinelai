@@ -92,6 +92,10 @@ sentinelai:
   #   external — POSTs every prompt to a third-party detection HTTP API
   #              (Lakera Guard, Protect AI, your own service). OPT-IN ONLY
   #              because the prompt text leaves the customer's environment.
+  signing:
+    private-key: ${SIGNING_PRIVATE_KEY:}
+    public-key: ${SIGNING_PUBLIC_KEY:}
+
   detection:
     strategy: ${DETECTION_STRATEGY:none}
     external:

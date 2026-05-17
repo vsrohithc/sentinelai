@@ -71,6 +71,25 @@ export async function fetchLog(id: string, signal?: AbortSignal): Promise<Prompt
   return apiFetch<PromptLog>(`/api/logs/${id}`, signal)
 }
 
+// ── Verification endpoint ─────────────────────────────────────────────────────
+
+export interface VerificationResult {
+  valid: boolean
+  recordId: string
+  algorithm: string
+  reason: string | null
+}
+
+/**
+ * Verifies the Ed25519 signature of a single audit log entry.
+ *
+ * @param id     - the UUID of the log entry to verify
+ * @param signal - AbortSignal for request cancellation
+ */
+export async function verifyLog(id: string, signal?: AbortSignal): Promise<VerificationResult> {
+  return apiFetch<VerificationResult>(`/api/logs/${id}/verify`, signal)
+}
+
 // ── Dashboard stats endpoint ──────────────────────────────────────────────────
 
 /**

@@ -180,7 +180,8 @@ public class LogQueryService {
                 log.getRiskScore(),
                 log.getMetadata(),
                 log.getLicenseKey(),
-                log.getCreatedAt()
+                log.getCreatedAt(),
+                log.getSignature()
         );
     }
 

@@ -1,10 +1,15 @@
 package com.sentinelai.controller;
 
 import com.sentinelai.dto.PromptLogDto;
+import com.sentinelai.dto.VerificationResultDto;
+import com.sentinelai.model.PromptLog;
+import com.sentinelai.repository.PromptLogRepository;
 import com.sentinelai.service.LogQueryService;
+import com.sentinelai.service.SigningService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,6 +39,8 @@ import java.util.UUID;
 public class LogController {
 
     private final LogQueryService logQueryService;
+    private final SigningService signingService;
+    private final PromptLogRepository promptLogRepository;
 
     /**
      * Returns a paginated list of audit log entries, newest first.
@@ -87,7 +94,50 @@ public class LogController {
     public ResponseEntity<PromptLogDto> getLog(@PathVariable UUID id) {
         return logQueryService.getLog(id)
                 .map(ResponseEntity::ok)
-                // Return 404 so the frontend can distinguish "not found" from server errors.
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Verifies the Ed25519 signature of a single audit log entry.
+     *
+     * <p>Re-fetches the raw entity (not the DTO) so the canonical form can be
+     * recomputed over the original field values and compared to the stored signature.</p>
+     *
+     * @param id the UUID of the log entry to verify
+     * @return 200 with {@code valid: true} if signature matches, {@code valid: false} if tampered,
+     *         or 404 if the record does not exist
+     */
+    @GetMapping("/{id}/verify")
+    public ResponseEntity<VerificationResultDto> verifyLog(@PathVariable UUID id) {
+        return promptLogRepository.findById(id)
+                .map(log -> ResponseEntity.ok(buildVerificationResult(log)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Returns the Ed25519 public key in PEM format.
+     *
+     * <p>Auditors can download this key and use it to verify any record's signature
+     * offline without contacting this service.</p>
+     *
+     * @return 200 with the PEM public key, or 404 if signing is not configured
+     */
+    @GetMapping(value = "/public-key", produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> getPublicKey() {
+        String pem = signingService.getPublicKeyPem();
+        if (pem == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(pem);
+    }
+
+    private VerificationResultDto buildVerificationResult(PromptLog log) {
+        if (!signingService.isEnabled()) {
+            return new VerificationResultDto(false, log.getId(), "Ed25519", "Signing is not configured on this server");
+        }
+        if (log.getSignature() == null) {
+            return new VerificationResultDto(false, log.getId(), "Ed25519", "Record has no signature — created before signing was enabled");
+        }
+        boolean valid = signingService.verify(log);
+        String reason = valid ? null : "Signature mismatch — record has been modified after signing";
+        return new VerificationResultDto(valid, log.getId(), "Ed25519", reason);
     }
 }

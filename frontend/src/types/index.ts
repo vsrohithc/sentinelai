@@ -76,6 +76,8 @@ export interface PromptLog {
   licenseKey: string | null
   /** Timestamp when the row was persisted (may lag requestTime by milliseconds) */
   createdAt: string
+  /** Base64-encoded Ed25519 signature; null if signing was disabled at write time */
+  signature: string | null
 }
 
 // ── Paged response ────────────────────────────────────────────────────────────

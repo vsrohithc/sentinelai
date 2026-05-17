@@ -161,4 +161,14 @@ public class PromptLog {
      */
     @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private OffsetDateTime createdAt;
+
+    /**
+     * Base64-encoded Ed25519 signature over the canonical record fields.
+     *
+     * <p>Computed by {@link com.sentinelai.service.SigningService} at write time
+     * and stored here so it can be verified later via {@code GET /api/logs/{id}/verify}.
+     * {@code null} means signing was disabled when this record was created.</p>
+     */
+    @Column(name = "signature", updatable = false, columnDefinition = "TEXT")
+    private String signature;
 }

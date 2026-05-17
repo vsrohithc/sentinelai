@@ -38,8 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuditService {
 
-    /** JPA repository for writing PromptLog rows. */
     private final PromptLogRepository promptLogRepository;
+    private final SigningService signingService;
 
     /**
      * Persists a completed {@link PromptLog} audit record asynchronously.
@@ -63,6 +63,7 @@ public class AuditService {
     @Transactional
     public void save(PromptLog promptLog) {
         try {
+            promptLog.setSignature(signingService.sign(promptLog));
             promptLogRepository.save(promptLog);
             log.debug("Persisted audit record id={} model={} riskScore={}",
                     promptLog.getId(), promptLog.getModel(), promptLog.getRiskScore());
