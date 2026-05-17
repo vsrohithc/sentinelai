@@ -10,7 +10,28 @@
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/vsrohithc/sentinelai)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/vsrohithc/sentinelai)
 
-**SentinelAI** is an open-source AI governance proxy that sits between your users and any AI provider (OpenAI, Anthropic, Gemini, Azure OpenAI). Every prompt and response is logged, scored for injection risk, and surfaced in a real-time dashboard — giving you a full audit trail for compliance, security, and oversight.
+**SentinelAI is AWS X-Ray for agentic AI.** Every agent call, tool execution, model response, and memory read — traced, signed, and audit-ready.
+
+An open-source AI governance proxy that sits between your application and any AI provider (OpenAI, Anthropic, Gemini, Azure OpenAI). Every prompt and response is logged, cryptographically signed, and surfaced in a real-time dashboard — giving you a tamper-evident audit trail for compliance, security, and oversight.
+
+---
+
+## Screenshots
+
+![SentinelAI landing page](docs/img/sentinel-landing.png)
+
+![Audit log dashboard](docs/img/sentinel-dashboard.png)
+
+<table>
+<tr>
+<td><img src="docs/img/sentinel-sig-success.png" alt="Signature verified — record unmodified" /></td>
+<td><img src="docs/img/sentinel-sig-fail.png" alt="Signature invalid — record tampered" /></td>
+</tr>
+<tr>
+<td align="center"><em>Signature verified — record unmodified</em></td>
+<td align="center"><em>Signature invalid — record tampered</em></td>
+</tr>
+</table>
 
 ---
 
@@ -18,8 +39,9 @@
 
 - **Proxy** — forwards prompts to OpenAI, Anthropic, Gemini, or Azure OpenAI and returns the response transparently
 - **Audit** — persists every prompt, response, and metadata to PostgreSQL asynchronously (zero added latency)
+- **Sign** — every audit record is signed with Ed25519 at write time; tampering is detectable via `GET /api/logs/{id}/verify`
 - **Score (optional, pluggable)** — every prompt can be scored for injection risk by an in-process rule-based detector, a third-party HTTP detection API, or skipped entirely. Operator's choice; default is "skip"
-- **Dashboard** — React UI with paginated audit log, risk filtering, and daily risk trend chart
+- **Dashboard** — React UI with paginated audit log, risk filtering, signature status badge, and daily risk trend chart
 - **Govern** — per-tenant license tiers with configurable log retention (7 / 30 / 90 / 365 days)
 - **Harden** — rate limiting (Bucket4j), API key auth, CORS, security headers, structured JSON logging
 
@@ -226,6 +248,8 @@ Full API documentation is at [docs/api.md](docs/api.md). Key endpoints:
 | `POST` | `/api/proxy` | Proxy a prompt to an AI provider |
 | `GET` | `/api/logs` | Paginated audit log with filters |
 | `GET` | `/api/logs/{id}` | Single audit log entry |
+| `GET` | `/api/logs/{id}/verify` | Verify the Ed25519 signature of an audit record |
+| `GET` | `/api/logs/public-key` | Ed25519 public key in PEM format for offline verification |
 | `GET` | `/api/health` | Service health (DB + detection API) |
 | `GET` | `/api/license/info` | License tier and retention info |
 
@@ -249,6 +273,17 @@ All configuration is via environment variables. Copy `.env.example` for a full a
 | `RATE_LIMIT_REFILL_PER_MINUTE` | `60` | Token refill rate (~1 req/sec sustained) |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Allowed CORS origins |
 | `DB_URL` | `jdbc:postgresql://localhost:5432/sentinelai` | PostgreSQL JDBC URL |
+| `SIGNING_PRIVATE_KEY` | _(disabled)_ | Base64-encoded Ed25519 private key PEM. Omit to disable signing. |
+| `SIGNING_PUBLIC_KEY` | _(disabled)_ | Base64-encoded Ed25519 public key PEM. Required when private key is set. |
+
+Generate a keypair with:
+
+```bash
+openssl genpkey -algorithm ed25519 -out private.pem
+openssl pkey -in private.pem -pubout -out public.pem
+export SIGNING_PRIVATE_KEY=$(base64 -i private.pem)
+export SIGNING_PUBLIC_KEY=$(base64 -i public.pem)
+```
 
 ---
 
@@ -265,10 +300,10 @@ sentinelai/
 │   │   ├── filter/                 # RequestContextFilter, ApiKeyFilter, RateLimitFilter
 │   │   ├── model/                  # JPA entities (PromptLog)
 │   │   ├── repository/             # Spring Data JPA repositories
-│   │   └── service/                # ProxyService, AuditService, LogQueryService, ...
+│   │   └── service/                # ProxyService, AuditService, LogQueryService, SigningService, ...
 │   └── src/main/resources/
 │       ├── application.yml         # Main configuration (env-var driven)
-│       ├── db/migration/           # Flyway SQL migrations (V1-V3)
+│       ├── db/migration/           # Flyway SQL migrations (V1-V4)
 │       └── logback-spring.xml      # Console (dev) + JSON (prod) logging
 ├── frontend/                       # React 18 + TypeScript + Vite + Tailwind
 │   └── src/
@@ -282,7 +317,8 @@ sentinelai/
 ├── docs/
 │   ├── architecture.md             # System design and component diagram
 │   ├── api.md                      # Full REST API reference
-│   └── deployment.md               # Production deployment guide
+│   ├── deployment.md               # Production deployment guide
+│   └── img/                        # Dashboard screenshots
 ├── compose.yaml                    # One-command quickstart (docker compose up --build -d)
 ├── .env.example                    # Annotated environment variable template
 └── Makefile                        # Developer shortcuts (make dev/test/demo/build)
